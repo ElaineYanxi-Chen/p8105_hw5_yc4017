@@ -81,3 +81,40 @@ tidy_df %>%
 
 
 Comparing the two groups, we see that the average outcome is much lower in the control group than the experimental group. In addition, while outcome for the control group remained fairly constant, the outcome for the experimental group increased steadily from week 1 to week 8.
+
+
+
+## Problem 2
+
+
+This dataset contains information on more than 52,000 criminal homicides over the past decade in 50 of the largest American cities. The information include the location and arrest information on each killing, along with basic demogrpahic information about each victim. We first download the data from the github repo and import it.
+
+```{r}
+homicide_raw = read_csv(file = "data/homicide-data.csv")
+```
+
+
+The raw data contains `r nrow(homicide_raw)` rows and `r ncol(homicide_raw)` columns. It has variables on the case ID, date, location including city, state, latitude, and longtitude, victim information including race, age, sex, and disposition. 
+
+Next, we want to create a `city_state` variable to summarize within cities the total number of homicides and the number of unsolved homicides. 
+
+```{r}
+homicide_raw = homicide_raw %>% 
+  janitor::clean_names() %>% 
+  mutate(
+    city_state = str_c(city, state, sep = ","),
+    status = 
+      case_when(
+      disposition == "Closed without arrest" ~ "unsolved",
+      disposition == "Open/No arrest" ~ "unsolved",
+      disposition == "Closed by arrest" ~ "solved"
+    )) 
+
+homicide_city = homicide_raw %>% 
+  group_by(city) %>% 
+  summarize(
+    total = n(),
+    unsolved = sum(status == "unsolved")
+  )
+```
+
