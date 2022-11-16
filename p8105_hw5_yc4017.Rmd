@@ -245,5 +245,62 @@ Based on the plot we can see that the power increases as the effect size increas
 
 Now we want to make a plot showing the average estimate of mu on the y axis and the true value of mu on the x axis.
 
-We want another plot showing the average eestimate of mu only in samples for which null was rejected on the y axis.
+We want another plot showing the average estimate of mu only in samples for which null was rejected on the y axis.
 
+
+```{r}
+all_estimates = 
+  powertest %>%
+  group_by(sample_mu) %>% 
+  summarize(all_samp_mean = mean(estimate))
+
+reject_estimates =
+  powertest %>%
+  group_by(sample_mu) %>% 
+  filter(status == TRUE) %>%
+  summarize(reject_samp_mean = mean(estimate))
+
+combined_df = 
+  full_join(all_estimates, reject_estimates, by = "sample_mu") %>%
+  pivot_longer(
+    all_samp_mean:reject_samp_mean, 
+    names_to = "samples",
+    values_to = "avg_estimates"
+  )
+
+all_plot = 
+  all_estimates %>%
+  ggplot(aes(x = sample_mu, y = all_samp_mean)) +
+  geom_point(alpha = 0.5) +
+  geom_line() +
+  labs(title = "All Sample",
+       x = "True value of μ",
+       y = "The average estimate of μ^")
+all_plot
+
+reject_plot = 
+  reject_estimates %>%
+  ggplot(aes(x = sample_mu, y = reject_samp_mean)) +
+  geom_point(alpha = 0.5) +
+  geom_line() +
+  labs(title = "Rejected-Null Sample",
+       x = "True value of μ",
+       y = "The average estimate of μ^")
+ reject_plot
+ 
+combined_plot = 
+  combined_df %>%
+  ggplot(aes(x = sample_mu, y = avg_estimates, group = samples)) +
+  geom_point(aes(colour = samples), alpha = 0.5) +
+  geom_line(aes(colour = samples)) +
+  labs(title = "True Value of μ vs.Average Estimate of μ^ in All Sample and Rejected-Null Sample",
+         x = "True population mean (μ)",
+         y = "The average estimate of μ^")
+combined_plot
+```
+
+
+- From the plot above, we can observe that the sample average of μ̂ across tests for which the null is rejected is approximately equal to the true value of μ, when μ lies between 0 and 4. 
+- It is evident that  μ̂ >μ in these cases. 
+- When μ => 4, then we see that μ̂ approximates μ. 
+- This is because as effect size increases, the power also increases. 
