@@ -1,0 +1,83 @@
+---
+title: "Homework 5"
+author: "Elaine Yanxi Chen"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+## Packages and settings
+
+First we load the packages necessary to knit this document.
+
+```{r packages and settings, message = FALSE}
+library(tidyverse)
+library(p8105.datasets)
+library(viridis)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+
+## Problem 1
+
+The study data for each participant is included in a separate file which include the subject ID and arm. We want to create a tidy dataframe with data from all participants, including the subject ID, arm, and observations over time.
+
+First, we want a dataframe with all file names. After, we map the `read_csv` function over each path name, which creates a list column. Lastly, we use `unnest` to expand the list column.
+
+```{r, message = FALSE}
+full_df = 
+  tibble(
+    files = list.files("data/data/"),
+    path = str_c("data/data/", files)
+  ) %>% 
+  mutate(data = map(path, read_csv)) %>% 
+  unnest()
+```
+
+Now we need to tidy the result. And file names to include control arm and subject ID. Tidy weekly observations and perform other tidying as needed.
+
+```{r}
+tidy_df = 
+  full_df %>% 
+  mutate(
+    files = str_replace(files, ".csv", ""),
+    group = str_sub(files, 1, 3)
+  ) %>% 
+  pivot_longer(
+    week_1:week_8,
+    names_to = "week",
+    values_to = "outcome",
+    names_prefix = "week_"
+  ) %>% 
+  select(group, subj = files, week, outcome)
+```
+
+
+Lastly, we will make a spaghetti plot for observations on each subject over time. 
+
+```{r}
+tidy_df %>% 
+  ggplot(aes(x = week, y = outcome, group = subj, colour = group)) +
+  geom_point() +
+  geom_path() +
+  facet_grid(~group)
+```
+
+
+Comparing the two groups, we see that the average outcome is much lower in the control group than the experimental group. In addition, while outcome for the control group remained fairly constant, the outcome for the experimental group increased steadily from week 1 to week 8.
