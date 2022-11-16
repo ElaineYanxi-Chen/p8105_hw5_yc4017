@@ -98,6 +98,7 @@ The raw data contains `r nrow(homicide_raw)` rows and `r ncol(homicide_raw)` col
 
 Next, we want to create a `city_state` variable to summarize within cities the total number of homicides and the number of unsolved homicides. 
 
+
 ```{r}
 homicide_raw = homicide_raw %>% 
   janitor::clean_names() %>% 
@@ -111,10 +112,21 @@ homicide_raw = homicide_raw %>%
     )) 
 
 homicide_city = homicide_raw %>% 
-  group_by(city) %>% 
+  group_by(city_state) %>% 
   summarize(
     total = n(),
     unsolved = sum(status == "unsolved")
   )
+```
+
+
+Now we want to use the `prop.test` function to estimate the proportion of homicides unsolved in Baltimore, MD.
+
+
+```{r}
+prop.test(
+  x = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(unsolved),
+  n = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(total)) %>% 
+  broom::tidy() 
 ```
 
