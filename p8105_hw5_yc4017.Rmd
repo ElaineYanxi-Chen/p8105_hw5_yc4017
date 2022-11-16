@@ -122,11 +122,49 @@ homicide_city = homicide_raw %>%
 
 Now we want to use the `prop.test` function to estimate the proportion of homicides unsolved in Baltimore, MD.
 
+Need to pull the estimated proportion and confidence intervals from the resulting tidy dataframe.
 
 ```{r}
 prop.test(
   x = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(unsolved),
   n = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(total)) %>% 
-  broom::tidy() 
+  saveRDS(., file = "data/prop_test_balt.rds")
+
+readRDS(file = "data/prop_test_balt.rds") %>% broom::tidy() %>% pull(estimate)
+```
+
+
+Now we need to run the same test for each of the cities in the dataset and extract the porportion of unsolved homicides and the confidence interval for each.
+
+```{r}
+homicide_prop = 
+  homicide_city %>% 
+  mutate(
+    proportions = map2(.x = unsolved, .y = total, ~prop.test(x = .x, n = .y)),
+    tidied = map(.x = proportions, ~broom::tidy(.x))
+  ) %>% 
+  select(-proportions) %>% 
+  unnest(tidied) %>% 
+  select(city_state, estimate, conf.low,conf.high)
+```
+
+
+Now we need to create a plot that shows the estimates and CIs for each city. We can use `geom_errorbar` to add error bars based on the upper and lower limits. Lastly, we organize the cities according to the porpotion of unsolved homicides. 
+
+```{r}
+homicide_plot = homicide_prop %>% 
+  ggplot(aes(x = fct_reorder(city_state, estimate), y = estimate)) + 
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+homicide_plot
+```
+
+
+## Problem 3
+
+```{r}
+
 ```
 
