@@ -14,6 +14,8 @@ library(tidyverse)
 library(p8105.datasets)
 library(viridis)
 
+set.seed(1)
+
 knitr::opts_chunk$set(
 	echo = TRUE,
 	warning = FALSE,
@@ -84,7 +86,7 @@ Comparing the two groups, we see that the average outcome is much lower in the c
 
 
 
-## Problem 2
+## Problem 2: Homicide rates
 
 
 This dataset contains information on more than 52,000 criminal homicides over the past decade in 50 of the largest American cities. The information include the location and arrest information on each killing, along with basic demogrpahic information about each victim. We first download the data from the github repo and import it.
@@ -162,9 +164,36 @@ homicide_plot
 ```
 
 
-## Problem 3
+## Problem 3: Simulation
+
+We will run a simulation to explore power in one-sample t-test.
+
+First set design elements with n = 30 and sigma = 5.
+
+Then set mu = 0 and generate 5000 datasets from the normal distribution model. 
 
 ```{r}
+sim_data = function(n = 30, mu = 0, sigma = 5){
+  
+    x = rnorm(n, mean = mu, sd = sigma)
+  
+  t_test = t.test(x, conf.int = 0.95) %>% broom::tidy() %>% select(estimate, p.value)
+  
+  t_test
+  
+}
 
+output = vector("list", 5000)
+
+for (i in 1:5000) {
+  
+ output[[i]] = sim_data()
+    
+}
+
+output %>% bind_rows()
 ```
+
+
+Now wee want to repeat the above for mu = {1, 2, 3, 4, 5, 6}
 
