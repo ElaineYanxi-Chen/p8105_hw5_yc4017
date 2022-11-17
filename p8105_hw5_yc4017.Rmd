@@ -162,7 +162,10 @@ homicide_plot = homicide_prop %>%
   ggplot(aes(x = fct_reorder(city_state, estimate), y = estimate)) + 
   geom_point() +  
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(title = "Unsolved Homicide Proportion Estimates and CIs for 50 Large U.S. Cities",
+       x = "City, State",
+       y = "Unsolved Homicide Proportion Estimate")
 
 homicide_plot
 ```
@@ -170,20 +173,21 @@ homicide_plot
 
 ## Problem 3: Simulation
 
-We will run a simulation to explore power in one-sample t-test.
+In this problem, we run a simulation to explore the power in a one-sample t-test. We fix the sample size n = 30 and the error variance sigma = 5, and explore how changes in the effect size mu would affect the power of the t-test. 
 
-First set design elements with n = 30 and sigma = 5.
+First, we will generate 5000 datasets from the normal distribution model. We will then use one-sample t-test and calculate a p-value by using `broom::tidy` to clean the output of the `t.test`. We combine output from each test using `bind_rows` to generate a tibble with the estimate and the p-value of each test.
 
-Then set mu = 0 and generate 5000 datasets from the normal distribution model. 
 
-```{r}
-sim_data = function(n = 30, mu = 0, sigma = 5){
+```{r power simulation 5000 datasets}
+sim_power = function(mu = 0, n = 30, sigma = 5) {
   
-    x = rnorm(n, mean = mu, sd = sigma)
+  sim_data = tibble(
+    x = rnorm(n, mean = mu, sd = sigma),
+  )
   
-  t_test = t.test(x, conf.int = 0.95) %>% broom::tidy() %>% select(estimate, p.value)
-  
-  t_test
+  t.test(sim_data) %>% 
+    broom::tidy() %>% 
+    select(estimate, p.value)
   
 }
 
@@ -191,58 +195,60 @@ output = vector("list", 5000)
 
 for (i in 1:5000) {
   
- output[[i]] = sim_data()
-    
+  output[[i]] = sim_power()
 }
 
-output %>% bind_rows()
+sim_results = bind_rows(output)
+```
+
+Alternatively, we could have used:
+
+```{r}
+expand_grid(
+    means = 0,
+    iter = 1:5000
+  ) %>% 
+  mutate(
+    estimate_df = map(means, sim_power)
+  ) %>% 
+  unnest(estimate_df)
+
 ```
 
 
-Now wee want to repeat the above for mu = {1, 2, 3, 4, 5, 6}
+Next, we want to repeat the same process but for different effect size of mu = {1, 2, 3, 4, 5, 6}. 
 
 ```{r}
-sim_mu = function(set){
-  output = vector("list", 5000)
-  for (i in 1:5000) {
-    
-     output[[i]] = sim_data(mu = set)
-     
-  }
-  
-power = 
-    output %>% 
-    bind_rows() 
-  
-  power
-  
-}
-
-powertest =
-  tibble(
-    sample_mu = c(0, 1, 2, 3, 4, 5, 6),
-    reject = map(sample_mu, sim_mu)
-  ) %>%  
-  unnest(reject) %>% 
-  mutate(status = ifelse(p.value < 0.05, TRUE, FALSE))
+sim_results_df = 
+  expand_grid(
+    effect_size = c(1:6),
+    iter = 1:5000
+  ) %>% 
+  mutate(
+    estimate_df = map(effect_size, sim_power)
+  ) %>% 
+  unnest(estimate_df)
 ```
 
 
 Next we want to make a plot showing the proportion of times the null was rejected, the power of the test, on the y-axis and the true value of mu on the x axis.
 
-
 ```{r}
-power_plot = powertest %>% 
-  group_by(sample_mu) %>% 
-  summarize(power = sum(status)/5000) %>% 
-  ggplot(aes(x = sample_mu, y = power)) +
-  geom_point(aes(colour = sample_mu), size = 2, alpha = 0.5) +
-  geom_line(alpha = 0.3) +
-  labs(title = "The Power of one-sample t-test vs. true value of mu",
-       x = "True value of mu", 
+power_plot = sim_results_df %>% 
+  group_by(effect_size) %>% 
+  summarize(
+    reject = sum(p.value < 0.05, na.rm = TRUE)
+  ) %>% 
+  ggplot(aes(x = effect_size, y = reject)) +
+  geom_point(aes(colour = effect_size), size = 3, alpha = 0.5) +
+  geom_line() +
+   labs(title = "The power of one-sample t-test vs. true value of mu",
+       x = "True value of mu (effect size)", 
        y = "Power of the one-sample t-test")
+
 power_plot
 ```
+
 
 Based on the plot we can see that the power increases as the effect size increases.
 
@@ -251,60 +257,3 @@ Now we want to make a plot showing the average estimate of mu on the y axis and 
 
 We want another plot showing the average estimate of mu only in samples for which null was rejected on the y axis.
 
-
-```{r}
-all_estimates = 
-  powertest %>%
-  group_by(sample_mu) %>% 
-  summarize(all_samp_mean = mean(estimate))
-
-reject_estimates =
-  powertest %>%
-  group_by(sample_mu) %>% 
-  filter(status == TRUE) %>%
-  summarize(reject_samp_mean = mean(estimate))
-
-combined_df = 
-  full_join(all_estimates, reject_estimates, by = "sample_mu") %>%
-  pivot_longer(
-    all_samp_mean:reject_samp_mean, 
-    names_to = "samples",
-    values_to = "avg_estimates"
-  )
-
-all_plot = 
-  all_estimates %>%
-  ggplot(aes(x = sample_mu, y = all_samp_mean)) +
-  geom_point(alpha = 0.5) +
-  geom_line() +
-  labs(title = "All Sample",
-       x = "True value of μ",
-       y = "The average estimate of μ^")
-all_plot
-
-reject_plot = 
-  reject_estimates %>%
-  ggplot(aes(x = sample_mu, y = reject_samp_mean)) +
-  geom_point(alpha = 0.5) +
-  geom_line() +
-  labs(title = "Rejected-Null Sample",
-       x = "True value of μ",
-       y = "The average estimate of μ^")
- reject_plot
- 
-combined_plot = 
-  combined_df %>%
-  ggplot(aes(x = sample_mu, y = avg_estimates, group = samples)) +
-  geom_point(aes(colour = samples), alpha = 0.5) +
-  geom_line(aes(colour = samples)) +
-  labs(title = "True Value of μ vs.Average Estimate of μ^ in All Sample and Rejected-Null Sample",
-         x = "True population mean (μ)",
-         y = "The average estimate of μ^")
-combined_plot
-```
-
-
-- From the plot above, we can observe that the sample average of μ̂ across tests for which the null is rejected is approximately equal to the true value of μ, when μ lies between 0 and 4. 
-- It is evident that  μ̂ >μ in these cases. 
-- When μ => 4, then we see that μ̂ approximates μ. 
-- This is because as effect size increases, the power also increases. 
