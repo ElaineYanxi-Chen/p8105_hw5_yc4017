@@ -122,21 +122,25 @@ homicide_city = homicide_raw %>%
 ```
 
 
-Now we want to use the `prop.test` function to estimate the proportion of homicides unsolved in Baltimore, MD.
-
-Need to pull the estimated proportion and confidence intervals from the resulting tidy dataframe.
+Now we want to use the `prop.test` function to estimate the proportion of homicides unsolved in Baltimore, MD. We will also pull the estimate and the 95% confidence interval of the proportion of unresolved homicides in Baltimore, MD, from the proportion test results. 
 
 ```{r}
-prop.test(
+prop_balt = prop.test(
   x = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(unsolved),
-  n = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(total)) %>% 
+  n = homicide_city %>% filter(city_state == "Baltimore,MD") %>% pull(total), 
+  alternative = c("two.sided"),
+  conf.level = 0.95,
+  correct = TRUE) 
+
+prop_balt %>% 
   saveRDS(., file = "data/prop_test_balt.rds")
 
-readRDS(file = "data/prop_test_balt.rds") %>% broom::tidy() %>% pull(estimate)
+prop_balt %>% broom::tidy() %>% select(c(estimate, conf.low, conf.high))
 ```
 
 
-Now we need to run the same test for each of the cities in the dataset and extract the porportion of unsolved homicides and the confidence interval for each.
+Now we need to run the same test for each of the cities in the dataset and extract the proportion of unsolved homicides and the confidence interval for each. To do so, we could `map` the `prop.test` function over the unsolved and total number of homicides of each city. After, we pipe the result into a clean dataset by using the `broom::tidy()` function. We then `unnest` the list column from the tidied dataset and select only the esetimate and confidence intervals that we are interested in for each `city_state`.
+
 
 ```{r}
 homicide_prop = 
@@ -145,13 +149,13 @@ homicide_prop =
     proportions = map2(.x = unsolved, .y = total, ~prop.test(x = .x, n = .y)),
     tidied = map(.x = proportions, ~broom::tidy(.x))
   ) %>% 
-  select(-proportions) %>% 
   unnest(tidied) %>% 
-  select(city_state, estimate, conf.low,conf.high)
+  select(city_state, estimate, conf.low, conf.high)
 ```
 
 
 Now we need to create a plot that shows the estimates and CIs for each city. We can use `geom_errorbar` to add error bars based on the upper and lower limits. Lastly, we organize the cities according to the porpotion of unsolved homicides. 
+
 
 ```{r}
 homicide_plot = homicide_prop %>% 
